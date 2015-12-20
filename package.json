@@ -1,0 +1,36 @@
+{
+  "name": "graph_migrations",
+  "version": "1.0.0",
+  "description": "Migrations for ArangoDB graphs.",
+  "main": "dist/main.js",
+  "scripts": {
+    "test": "mocha --compilers js:babel-register test/*_test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/sleepycat/graphmigrations"
+  },
+  "keywords": [
+    "graph",
+    "migration",
+    "arangodb"
+  ],
+  "author": "Mike Williamson <mike@korora.ca>",
+  "license": "ISC",
+  "dependencies": {
+    "arangojs": "^4.2.1"
+  },
+  "devDependencies": {
+    "babel": "^6.3.13",
+    "babel-preset-es2015": "^6.3.13",
+    "babel-preset-stage-0": "^6.3.13",
+    "babel-register": "^6.3.13",
+    "mocha": "^2.3.4"
+  },
+  "babel": {
+    "presets": [
+      "es2015",
+      "stage-0"
+    ]
+  }
+}
