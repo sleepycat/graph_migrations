@@ -5,12 +5,17 @@ import vertexData from './data/vertices'
 import edgeData from './data/edges'
 import assert from 'assert';
 import arangojs, {Database, aqlQuery} from 'arangojs';
+import {
+  attributeToVertex,
+  createVertex,
+  removeAttribute
+} from '../src/main'
 
 describe('Test setup', () => {
 
   let db = arangojs({databaseName: "test", url: "http://localhost:8529"})
 
-  before(async () => {
+  beforeEach(async () => {
     let vertexCollection = await db.collection('vertices')
     let edgesCollection = await db.edgeCollection('edges')
     try {
@@ -34,6 +39,42 @@ describe('Test setup', () => {
     let results = await cursor.all()
     assert.equal(23, results[0]);
   });
+
+  afterEach(() => db.truncate())
+
+  let vertexLike = async (example) => {
+    let aql = aqlQuery`
+      FOR v IN vertices FILTER MATCHES(v, ${example}) RETURN v
+    `
+    let cursor = await db.query(aql)
+    return cursor.all()
+  }
+
+  it('Can call a class method on the migration class', async () => {
+    let shopify = await vertexLike({founding_year: 2004});
+    await attributeToVertex({founding_year: 2004}, {direction: "inbound"})
+    let newVertex = await vertexLike({founding_year: 2004});
+    assert.notEqual("Shopify", newVertex[0].name)
+  })
+
+  describe("createVertex", () => {
+    it("creates a vertex in the specified collection", async () => {
+      let vertex = await createVertex({foo: "bar"}, "vertices")
+      assert.equal("bar", vertex[0].foo)
+      assert.notEqual(null, vertex[0]._id)
+    })
+  })
+
+  describe("removeAttribute", () => {
+    it("creates a vertex in the specified collection", async () => {
+      let vertexWith = await createVertex({foo: "bar"}, "vertices")
+      let vertexWithout = await removeAttribute({foo: "bar"}, "vertices")
+      assert.equal(vertexWith[0]._id, vertexWithout[0]._id)
+      assert.equal("bar", vertexWith[0].foo)
+      assert.equal(null, vertexWithout[0].foo)
+    })
+  })
+
 
 });
 
