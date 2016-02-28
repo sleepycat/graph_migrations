@@ -36,53 +36,65 @@ let removeAttribute = async (example, collection) => {
 module.exports.removeAttribute = removeAttribute;
 
 let attributeToVertex = async (example, options) => {
-  //TODO: this is pretty terrible.
 
-  let vertexCollection = await db.collection('vertices')
-  let edgesCollection = await db.edgeCollection('edges')
+  var action = String((args) => {
 
-  //FIXME: collection arg is not used currently
-  let oldVertices = await removeAttribute(example, "vertices")
+    var db = require("internal").db;
 
-  //FIXME: collection arg is not used currently
-  let newVertex = await createVertex(example, "vertices")
-  let newVertexID = newVertex[0]._id
+    var example = args[0]
+    var options = args[1]
 
-  //oldVertices is an array of all the documents we removed the
-  //attribute from.
-  //Now we create edges either to or from all the vertices we removed
-  //the attribute from to the newly created vertex
-  if(options.direction == "inbound") {
-    console.log( options.direction )
-    let edgeQuery = aqlQuery`
-    FOR vertex IN ${oldVertices}
-      UPSERT { _to: ${newVertexID}, _from: vertex._id }
-      INSERT { _to: ${newVertexID}, _from: vertex._id }
-      UPDATE {}
-        IN edges
-          RETURN NEW
+    var vertexCollection = db._collection('vertices')
+    var edgesCollection = db._collection('edges')
+
+    var removeAttributesAQL = `
+      FOR vertex IN vertices
+      FILTER MATCHES(vertex, @example)
+      REPLACE vertex WITH UNSET(vertex, ATTRIBUTES(@example)) IN @@collection
+      RETURN NEW
     `
-    let cursor = await db.query(edgeQuery)
-    let edges = await cursor.all()
-  } else {
-    let edgeQuery = aqlQuery`
-    FOR vertex IN ${oldVertices}
-      UPSERT { from: ${newVertexID}, _to: vertex._id }
-      INSERT { _from: ${newVertexID}, _to: vertex._id }
-      UPDATE {}
-        IN edges
-          RETURN NEW
+    //All the vertices that have had an attribute removed
+    var verticesWithAttrsRemoved = db._query(removeAttributesAQL, {example: example, "@collection": "vertices"}).toArray()
+
+    var createVertexAQL = `
+    UPSERT @attrs
+    INSERT @attrs
+    UPDATE {}
+    IN @@collection
+      RETURN NEW
     `
-    let cursor = await db.query(edgeQuery)
-    let edges = await cursor.all()
-  }
+    var newVertex = db._query(createVertexAQL, {attrs: example, "@collection": "vertices"}).toArray()[0]
 
-  //In theory all went well.
-  return true
-}
+    //verticesWithAttrsRemoved is an array of all the documents we removed the
+    //attribute from.
+    //Now we create edges either to or from all the vertices we removed
+    //the attribute from to the newly created vertex
+    if(options.direction == "inbound") {
+      var createEdgesAQL = `
+      FOR vertex IN @verticesWithAttrsRemoved
+        UPSERT { _to: @newVertexID, _from: vertex._id }
+        INSERT { _to: @newVertexID, _from: vertex._id }
+        UPDATE {}
+        IN @@collection
+        RETURN NEW
+      `
+      var edges = db._query(createEdgesAQL, {verticesWithAttrsRemoved: verticesWithAttrsRemoved, newVertexID: newVertex._id, "@collection": 'edges'}).toArray()
+    } else {
+      var createEdgesAQL = `
+      FOR vertex IN @verticesWithAttrsRemoved
+      UPSERT { _from: @newVertexID, _to: vertex._id }
+      INSERT { _from: @newVertexID, _to: vertex._id }
+      UPDATE {}
+      IN @@collection
+      RETURN NEW
+      `
+      var edges = db._query(createEdgesAQL, {verticesWithAttrsRemoved: verticesWithAttrsRemoved, newVertexID: newVertex._id, "@collection": 'edges'}).toArray()
+    }
 
-let vertexToAttribute = () => {
-  return "vertex to attribute"
-}
+    //In theory all went well.
+    return newVertex
+  })
+  await db.transaction({write: ['vertices', 'edges']}, action, [example, options])
+};
 
 module.exports.attributeToVertex = attributeToVertex;

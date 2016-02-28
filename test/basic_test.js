@@ -50,9 +50,9 @@ describe('Test setup', () => {
     return cursor.all()
   }
 
-  it('Can call a class method on the migration class', async () => {
+  it('can reify an attribute', async () => {
     let shopify = await vertexLike({founding_year: 2004});
-    await attributeToVertex({founding_year: 2004}, {direction: "inbound"})
+    await attributeToVertex({founding_year: 2004}, {direction: "inbound", additional_attrs: {}})
     let newVertex = await vertexLike({founding_year: 2004});
     assert.notEqual("Shopify", newVertex[0].name)
   })
