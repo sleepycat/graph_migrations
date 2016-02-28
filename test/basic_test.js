@@ -62,6 +62,18 @@ describe('Test setup', () => {
     assert.equal("Shopify", reachableVertex.name)
   })
 
+  it('can reify an attribute with and outbound edge', async () => {
+    //transform the test data by reifying founding_year
+    await attributeToVertex({founding_year: 2004}, {direction: "outbound", additional_attrs: {}})
+    //get the new vertex
+    let newVertex = await vertexLike({founding_year: 2004})
+    //Can we walk inbound edges and reach shopify?
+    let aql = aqlQuery`FOR v, e, p IN OUTBOUND ${newVertex[0]} GRAPH "test" RETURN v`
+    let result = await db.query(aql)
+    let reachableVertex = await result.next()
+    assert.equal("Shopify", reachableVertex.name)
+  })
+
   describe("createVertex", () => {
     it("creates a vertex in the specified collection", async () => {
       let vertex = await createVertex({foo: "bar"}, "vertices")
