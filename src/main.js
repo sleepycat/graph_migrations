@@ -52,9 +52,6 @@ let attributeToVertex = async (example, options) => {
       var additional_edge_attributes = {}
     }
 
-    var vertexCollection = db._collection('vertices')
-    var edgesCollection = db._collection('edges')
-
     var removeAttributesAQL = `
       FOR vertex IN vertices
       FILTER MATCHES(vertex, @example)
