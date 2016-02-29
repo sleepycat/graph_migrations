@@ -44,6 +44,14 @@ let attributeToVertex = async (example, options) => {
     var example = args[0]
     var options = args[1]
 
+    if(options.additional_attrs){
+      var additional_vertex_attributes = options.additional_attrs.vertex
+      var additional_edge_attributes = options.additional_attrs.edge
+    } else {
+      var additional_vertex_attributes = {}
+      var additional_edge_attributes = {}
+    }
+
     var vertexCollection = db._collection('vertices')
     var edgesCollection = db._collection('edges')
 
@@ -57,13 +65,11 @@ let attributeToVertex = async (example, options) => {
     var verticesWithAttrsRemoved = db._query(removeAttributesAQL, {example: example, "@collection": "vertices"}).toArray()
 
     var createVertexAQL = `
-    UPSERT @attrs
-    INSERT @attrs
-    UPDATE {}
+    INSERT MERGE(@attrs, @additional_attrs)
     IN @@collection
       RETURN NEW
     `
-    var newVertex = db._query(createVertexAQL, {attrs: example, "@collection": "vertices"}).toArray()[0]
+    var newVertex = db._query(createVertexAQL, {attrs: example, additional_attrs: additional_vertex_attributes, "@collection": "vertices"}).toArray()[0]
 
     //verticesWithAttrsRemoved is an array of all the documents we removed the
     //attribute from.
@@ -72,24 +78,21 @@ let attributeToVertex = async (example, options) => {
     if(options.direction == "inbound") {
       var createEdgesAQL = `
       FOR vertex IN @verticesWithAttrsRemoved
-        UPSERT { _to: @newVertexID, _from: vertex._id }
-        INSERT { _to: @newVertexID, _from: vertex._id }
-        UPDATE {}
+        LET merged = (MERGE({ _to: @newVertexID, _from: vertex._id }, @additional_attrs))
+        INSERT merged
         IN @@collection
-        RETURN NEW
+          RETURN NEW
       `
-      var edges = db._query(createEdgesAQL, {verticesWithAttrsRemoved: verticesWithAttrsRemoved, newVertexID: newVertex._id, "@collection": 'edges'}).toArray()
     } else {
       var createEdgesAQL = `
       FOR vertex IN @verticesWithAttrsRemoved
-      UPSERT { _from: @newVertexID, _to: vertex._id }
-      INSERT { _from: @newVertexID, _to: vertex._id }
-      UPDATE {}
-      IN @@collection
-      RETURN NEW
+        LET merged = (MERGE({ _from: @newVertexID, _to: vertex._id }, @additional_attrs))
+        INSERT merged
+        IN @@collection
+          RETURN NEW
       `
-      var edges = db._query(createEdgesAQL, {verticesWithAttrsRemoved: verticesWithAttrsRemoved, newVertexID: newVertex._id, "@collection": 'edges'}).toArray()
     }
+    var edges = db._query(createEdgesAQL, {verticesWithAttrsRemoved: verticesWithAttrsRemoved, additional_attrs: additional_edge_attributes,  newVertexID: newVertex._id, "@collection": 'edges'}).toArray()
 
     //In theory all went well.
     return newVertex
