@@ -7,8 +7,10 @@ import assert from 'assert';
 import arangojs, {Database, aqlQuery} from 'arangojs';
 import {
   attributeToVertex,
+  vertexToAttribute,
   createVertex,
-  removeAttribute
+  removeAttribute,
+  allCollections
 } from '../src/main'
 
 describe('Test setup', () => {
@@ -137,6 +139,27 @@ describe('Test setup', () => {
     })
   })
 
+  describe('vertexToAttribute', () => {
+
+    it('takes a vertex id', async () => {
+
+      let vertices = await vertexToAttribute({name: "mysql"}, "usesthis", {direction: "inbound"})
+      assert.equal(4, vertices.length)
+      assert.equal("mysql", vertices[0].name)
+      assert.equal("office", vertices[0].type)
+    })
+
+  })
+
+  describe('allCollections', () => {
+
+    it('returns and array of all the collections associated with the specified graph', async () => {
+
+      let collections = await allCollections("usesthis")
+      assert.deepEqual(['edges', 'vertices'], collections)
+    })
+
+  })
 
 });
 

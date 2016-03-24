@@ -27,10 +27,7 @@ exploration its currently an node module.
 The code at the moment assumes you have two collections: vertices &
 edges.
 
-There is just one useful function working at the moment. It runs in a
-transaction and while there is plenty of room for improvement it does do
-useful work.
-
+### attributeToVertex
 
 ```javascript
 attributeToVertex({year: 2004}, {direction: "inbound"})
@@ -50,13 +47,26 @@ additional_attrs option:
 attributeToVertex({founding_year: 2004}, {direction: "inbound",
 additional_attrs: {vertex: {foo: "bar"}, edge: {}}})
 ```
+### vertexToAttribute
+
+```javascript
+vertexToAttribute({name: "mysql"}, "usesthis", {direction: "inbound"})
+```
+
+This is aimed at getting rid of hubs (high degree vertices) in your data set.
+
+The first argument is an example that is assumed to uniquely identify
+the hub.
+
+Attributes from the hub will be copied to all neighbors with inbound
+edges (obviously {direction: "outbound"} is an option as well), with the
+neighbors attributes being retained in the case of duplication.
+
+The hub and any edges are then deleted.
 
 ## TODO
 
-* Do some thinking about working without requiring specific collection
-  names.
-* Make a vertexToAttribute function.
-* Keep going!
+* Remove collection names from attributeToVertex
 
 This is all highly experimental.
 Ideas and pull requests welcome.

@@ -94,7 +94,79 @@ let attributeToVertex = async (example, options) => {
     //In theory all went well.
     return newVertex
   })
-  await db.transaction({write: ['vertices', 'edges']}, action, [example, options])
+  return await db.transaction({write: ['vertices', 'edges']}, action, [example, options])
 };
 
 module.exports.attributeToVertex = attributeToVertex;
+
+let describeGraph = async (graphName) => {
+  let graph = await db.graph(graphName)
+  return await graph.get()
+}
+
+export async function allCollections(graphName) {
+  let collections = []
+  let graphDescription = await describeGraph(graphName)
+  graphDescription.edgeDefinitions.forEach((edgeDef) => {
+    collections.push(edgeDef.collection)
+    //XXX: this means we are not allowing edge collections that point to
+    //more than one document collection
+    collections.push(edgeDef.to[0])
+    collections.push(edgeDef.from[0])
+  })
+  return Array.from(new Set(collections))
+}
+
+
+export async function vertexToAttribute(example, graphName, options) {
+
+  var action = String((args) => {
+
+    var db = require("internal").db;
+    var graph_module = require("@arangodb/general-graph")
+
+    var example = args[0]
+    var graphName = args[1]
+    var options = args[2]
+    var aql = `RETURN GRAPH_VERTICES(@graph, @example)`
+    var matches = db._query(aql, {graph: graphName, example: example}).toArray()[0]
+
+    if(matches.length > 1) {
+      throw new Error('Example matched more than a single vertex.')
+    }
+
+    var startingVertex = matches[0]
+    var neighborsQuery = `RETURN GRAPH_NEIGHBORS(@graph, @startingVertex, {includeData: true, direction: @direction})`
+    var neighbors = db._query(neighborsQuery, {graph: graphName, startingVertex, direction: options.direction}).toArray()[0]
+
+    var edgesQuery = `RETURN GRAPH_EDGES(@graph, @startingVertex, {includeData: true, direction: @direction})`
+    var edges = db._query(edgesQuery, {graph: graphName, startingVertex, direction: options.direction}).toArray()[0]
+
+    //attach startingVertex attrs to each of the neighboring vertices
+    var newNeighbors = []
+    neighbors.forEach(function(vertex) {
+      var collection = vertex._id.split('/')[0]
+      //XXX: Here we are using the order of the arguments to MERGE to
+      //handle duplicate attributes by strategically clobbering them
+      //with the existing attributes. Revisit this.
+      var mergeQuery = `
+        REPLACE @example WITH MERGE(@vertexAttrs, @example) IN @@collection RETURN NEW
+      `
+      var newNeighbor = db._query(mergeQuery, {example: vertex, vertexAttrs: startingVertex, "@collection": collection}).toArray()[0]
+      newNeighbors.push(newNeighbor)
+    })
+
+    //delete the startingVertex
+    db._query(`REMOVE @key IN @@collection`, {key: startingVertex._key, "@collection": startingVertex._id.split("/")[0]}).toArray()
+    //finally delete each of the edges
+    //XXX: Will need to consider a way to rescue data from these edges
+    edges.forEach(function(edge) {
+      var collection = edge._id.split('/')[0]
+      db._query(`REMOVE @key IN @@collection`, {key: edge._key, "@collection": collection}).toArray()
+    })
+
+    return newNeighbors
+  })
+
+  return await db.transaction({write: await allCollections(graphName)}, action, [example, graphName, options])
+};
