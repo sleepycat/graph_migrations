@@ -35,14 +35,15 @@ let removeAttribute = async (example, collection) => {
 
 module.exports.removeAttribute = removeAttribute;
 
-let attributeToVertex = async (example, options) => {
+let attributeToVertex = async (example, graphName, options) => {
 
   var action = String((args) => {
 
     var db = require("internal").db;
 
     var example = args[0]
-    var options = args[1]
+    var graphName = args[1]
+    var options = args[2]
 
     if(options.additional_attrs){
       var additional_vertex_attributes = options.additional_attrs.vertex
@@ -94,7 +95,7 @@ let attributeToVertex = async (example, options) => {
     //In theory all went well.
     return newVertex
   })
-  return await db.transaction({write: ['vertices', 'edges']}, action, [example, options])
+  return await db.transaction({write: await allCollections(graphName)}, action, [example, graphName, options])
 };
 
 module.exports.attributeToVertex = attributeToVertex;

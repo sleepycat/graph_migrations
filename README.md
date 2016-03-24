@@ -30,7 +30,7 @@ edges.
 ### attributeToVertex
 
 ```javascript
-attributeToVertex({year: 2004}, {direction: "inbound"})
+attributeToVertex({year: 2004}, "mygraph", {direction: "inbound"})
 ```
 The code above will create a new vertex with {year: 2004} and remove the
 attribute "year": 2004 from all the documents in the vertices
@@ -44,13 +44,13 @@ be able to add extra attributes to be added. You can do that with the
 additional_attrs option:
 
 ```javascript
-attributeToVertex({founding_year: 2004}, {direction: "inbound",
+attributeToVertex({founding_year: 2004}, "mygraph", {direction: "inbound",
 additional_attrs: {vertex: {foo: "bar"}, edge: {}}})
 ```
 ### vertexToAttribute
 
 ```javascript
-vertexToAttribute({name: "mysql"}, "usesthis", {direction: "inbound"})
+vertexToAttribute({name: "mysql"}, "mygraph", {direction: "inbound"})
 ```
 
 This is aimed at getting rid of hubs (high degree vertices) in your data set.
