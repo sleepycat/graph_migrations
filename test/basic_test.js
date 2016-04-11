@@ -10,6 +10,7 @@ import {
   vertexToAttribute,
   createVertex,
   removeAttribute,
+  redirectEdges,
   allCollections
 } from '../src/main'
 
@@ -54,7 +55,7 @@ describe('Test setup', () => {
 
   it('can reify an attribute with and inbound edge', async () => {
     //transform the test data by reifying founding_year
-    await attributeToVertex({founding_year: 2004}, "usesthis", {direction: "inbound"})
+    await attributeToVertex({founding_year: 2004}, "test", {direction: "inbound"})
     //get the new vertex
     let newVertex = await vertexLike({founding_year: 2004})
     //Can we walk inbound edges and reach shopify?
@@ -66,7 +67,7 @@ describe('Test setup', () => {
 
   it('can reify an attribute with and outbound edge', async () => {
     //transform the test data by reifying founding_year
-    await attributeToVertex({founding_year: 2004}, "usesthis", {direction: "outbound", additional_attrs: {vertex: {}, edge: {}}})
+    await attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {}}})
     //get the new vertex
     let newVertex = await vertexLike({founding_year: 2004})
     //Can we walk inbound edges and reach shopify?
@@ -78,7 +79,7 @@ describe('Test setup', () => {
 
   it('can reify an attribute and add additional attributes to the outbound edge', async () => {
     //transform the test data by reifying founding_year
-    await attributeToVertex({founding_year: 2004}, "usesthis", {direction: "outbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
+    await attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
     //get the new vertex
     let newVertex = await vertexLike({founding_year: 2004})
     //Can we walk inbound edges and reach shopify?
@@ -90,7 +91,7 @@ describe('Test setup', () => {
 
   it('can reify an attribute and add additional attributes to the inbound edge', async () => {
     //transform the test data by reifying founding_year
-    await attributeToVertex({founding_year: 2004}, "usesthis", {direction: "inbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
+    await attributeToVertex({founding_year: 2004}, "test", {direction: "inbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
     //get the new vertex
     let newVertex = await vertexLike({founding_year: 2004})
     //Can we walk inbound edges and reach shopify?
@@ -102,7 +103,7 @@ describe('Test setup', () => {
 
   it('can reify an attribute and add additional attributes to the vertex', async () => {
     //transform the test data by reifying founding_year
-    await attributeToVertex({founding_year: 2004}, "usesthis", {direction: "inbound", additional_attrs: {vertex: {foo: "bar"}, edge: {}}})
+    await attributeToVertex({founding_year: 2004}, "test", {direction: "inbound", additional_attrs: {vertex: {foo: "bar"}, edge: {}}})
     //get the new vertex
     let newVertex = await vertexLike({founding_year: 2004})
     assert.equal("bar", newVertex[0].foo)
@@ -111,7 +112,7 @@ describe('Test setup', () => {
 
   it('does not explode when additional_attrs is not present', async () => {
     //transform the test data by reifying founding_year
-    await attributeToVertex({founding_year: 2004}, "usesthis", {direction: "inbound"})
+    await attributeToVertex({founding_year: 2004}, "test", {direction: "inbound"})
     //get the new vertex
     let newVertex = await vertexLike({founding_year: 2004})
     //Can we walk inbound edges and reach shopify?
@@ -143,7 +144,7 @@ describe('Test setup', () => {
 
     it('takes a vertex id', async () => {
 
-      let vertices = await vertexToAttribute({name: "mysql"}, "usesthis", {direction: "inbound"})
+      let vertices = await vertexToAttribute({name: "mysql"}, "test", {direction: "inbound"})
       assert.equal(4, vertices.length)
       assert.equal("mysql", vertices[0].name)
       assert.equal("office", vertices[0].type)
@@ -155,8 +156,44 @@ describe('Test setup', () => {
 
     it('returns and array of all the collections associated with the specified graph', async () => {
 
-      let collections = await allCollections("usesthis")
+      let collections = await allCollections("test")
       assert.deepEqual(['edges', 'vertices'], collections)
+    })
+
+  })
+
+  describe('redirectEdges', () => {
+
+    let getEdgesFor = async (example, direction, edgeExample) => {
+      if(typeof edgeExample == 'undefined') {
+	var getEdgesAQL = aqlQuery`FOR edge IN GRAPH_EDGES("test", ${example}, {includeData: true, direction: ${direction}}) RETURN edge`
+      } else {
+	var getEdgesAQL = aqlQuery`FOR edge IN GRAPH_EDGES("test", ${example}, {includeData: true, direction: ${direction}, edgeExamples: [${edgeExample}]}) RETURN edge`
+      }
+      let cursor = await db.query(getEdgesAQL)
+      return await cursor.all()
+    }
+
+    it('accepts a starting example and target', async () => {
+      //scoop up Shopify and it's york office
+      let shopifyAQL = aqlQuery`FOR vertex IN GRAPH_SHORTEST_PATH("test", {name: "Shopify"}, {address: "126 York Street, Ottawa, ON K1N, Canada"},{includeData: true})[*].vertices RETURN vertex`
+      let result = await db.query(shopifyAQL)
+      let results = await result.all()
+      let shopify = results[0][0]
+      let shopify_york_office = results[0][1]
+
+      let york_office_edges_before = await getEdgesFor(shopify_york_office, "outbound", {type: "uses"})
+      let shopify_edges_before = await getEdgesFor(shopify, "outbound", {type: "uses"})
+
+      //Redirect the "uses" type edges from the office to shopify
+      let vertices = await redirectEdges(shopify_york_office, shopify, "test", {direction: "outbound", example: {type: "uses"}})
+
+      let york_office_edges_after = await getEdgesFor(shopify_york_office, "outbound", {type: "uses"})
+      let shopify_edges_after = await getEdgesFor(shopify, "outbound", {type: "uses"})
+      assert.equal(7, york_office_edges_before.length)
+      assert.equal(0, shopify_edges_before.length)
+      assert.equal(0, york_office_edges_after.length)
+      assert.equal(7, shopify_edges_after.length)
     })
 
   })
