@@ -64,6 +64,15 @@ neighbors attributes being retained in the case of duplication.
 
 The hub and any edges are then deleted.
 
+### redirectEdges
+
+```javascript
+redirectEdges({_id: "vertices/1234"}, {_id: "vertices/5678"}, "mygraph", {direction: "inbound"})
+```
+If you have edges pointing somewhere and want them pointing somewhere
+else, this is the function that does it. It expects to work with
+something with an `_id` attribute.
+
 ## TODO
 
 * Remove collection names from attributeToVertex
