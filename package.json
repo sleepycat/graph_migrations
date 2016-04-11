@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "github.com/sleepycat/graphmigrations"
+    "url": "https://github.com/sleepycat/graph_migrations"
   },
   "keywords": [
     "graph",
