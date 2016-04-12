@@ -140,53 +140,54 @@ describe('GraphMigration', () => {
       assert.equal("bar", edge.foo)
     })
 
+    it('can reify an attribute and add additional attributes to the outbound edge', async () => {
+      //transform the test data by reifying founding_year
+      let gm = new GraphMigration("test")
+      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
+      //get the new vertex
+      let newVertex = await vertexLike({founding_year: 2004})
+      //Can we walk inbound edges and reach shopify?
+      let aql = aqlQuery`FOR v, e, p IN OUTBOUND ${newVertex[0]} GRAPH "test" RETURN e`
+      let result = await db.query(aql)
+      let edge = await result.next()
+      assert.equal("bar", edge.foo)
+    })
+
     it('can reify an attribute and add additional attributes to the vertex', async () => {
       //transform the test data by reifying founding_year
       let gm = new GraphMigration("test")
-      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "inbound", additional_attrs: {vertex: {foo: "bar"}, edge: {}}})
+      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {asdf: "qwerty"}}})
       //get the new vertex
-      let newVertex = await vertexLike({founding_year: 2004})
-      assert.equal("bar", newVertex[0].foo)
+      let results = await vertexLike({asdf: "qwerty"})
+      let newVertex = results[0]
+      assert.equal("qwerty", newVertex.asdf)
     })
 
-  it('can reify an attribute and add additional attributes to the outbound edge', async () => {
-    //transform the test data by reifying founding_year
-    let gm = new GraphMigration("test")
-    await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
-    //get the new vertex
-    let newVertex = await vertexLike({founding_year: 2004})
-    //Can we walk inbound edges and reach shopify?
-    let aql = aqlQuery`FOR v, e, p IN OUTBOUND ${newVertex[0]} GRAPH "test" RETURN e`
-    let result = await db.query(aql)
-    let edge = await result.next()
-    assert.equal("bar", edge.foo)
-  })
+    it('does not explode when additional_attrs is not present', async () => {
+      //transform the test data by reifying founding_year
+      let gm = new GraphMigration("test")
+      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "inbound"})
+      //get the new vertex
+      let newVertex = await vertexLike({founding_year: 2004})
+      //Can we walk inbound edges and reach shopify?
+      let aql = aqlQuery`FOR v, e, p IN INBOUND ${newVertex[0]} GRAPH "test" RETURN v`
+      let result = await db.query(aql)
+      let reachableVertex = await result.next()
+      assert.equal("Shopify", reachableVertex.name)
+    })
 
-  it('does not explode when additional_attrs is not present', async () => {
-    //transform the test data by reifying founding_year
-    let gm = new GraphMigration("test")
-    await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "inbound"})
-    //get the new vertex
-    let newVertex = await vertexLike({founding_year: 2004})
-    //Can we walk inbound edges and reach shopify?
-    let aql = aqlQuery`FOR v, e, p IN INBOUND ${newVertex[0]} GRAPH "test" RETURN v`
-    let result = await db.query(aql)
-    let reachableVertex = await result.next()
-    assert.equal("Shopify", reachableVertex.name)
-  })
-
-  it('can reify an attribute with and outbound edge', async () => {
-    //transform the test data by reifying founding_year
-    let gm = new GraphMigration("test")
-    await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {}}})
-    //get the new vertex
-    let newVertex = await vertexLike({founding_year: 2004})
-    //Can we walk inbound edges and reach shopify?
-    let aql = aqlQuery`FOR v, e, p IN OUTBOUND ${newVertex[0]} GRAPH "test" RETURN v`
-    let result = await db.query(aql)
-    let reachableVertex = await result.next()
-    assert.equal("Shopify", reachableVertex.name)
-  })
+    it('can reify an attribute with and outbound edge', async () => {
+      //transform the test data by reifying founding_year
+      let gm = new GraphMigration("test")
+      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {}}})
+      //get the new vertex
+      let newVertex = await vertexLike({founding_year: 2004})
+      //Can we walk inbound edges and reach shopify?
+      let aql = aqlQuery`FOR v, e, p IN OUTBOUND ${newVertex[0]} GRAPH "test" RETURN v`
+      let result = await db.query(aql)
+      let reachableVertex = await result.next()
+      assert.equal("Shopify", reachableVertex.name)
+    })
 
   })
 

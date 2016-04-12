@@ -192,8 +192,8 @@ async attributeToVertex(example, graphName, options) {
     var options = args[2]
 
     if(options.additional_attrs){
-      var additional_vertex_attributes = options.additional_attrs.vertex
-      var additional_edge_attributes = options.additional_attrs.edge
+      var additional_vertex_attributes = (typeof options.additional_attrs.vertex === "undefined" ? {} : options.additional_attrs.vertex);
+      var additional_edge_attributes = (typeof options.additional_attrs.edge === "undefined" ? {} : options.additional_attrs.edge);
     } else {
       var additional_vertex_attributes = {}
       var additional_edge_attributes = {}
