@@ -24,57 +24,119 @@ exploration its currently an node module.
 
 ## What works
 
-The code at the moment assumes you have two collections: vertices &
-edges.
+### vertexToAttribute
+
+This is aimed at getting rid of hubs (high degree vertices) in your data set.
+The best way to show this is with some test data:
+
+```javascript
+//Our vertices
+[
+  {
+    "foo" : "bar",
+    "_id" : "vertices/4464345735885",
+    "_rev" : "4464345735885",
+    "_key" : "4464345735885"
+  },
+  {
+    "baz" : "quxx",
+    "_id" : "vertices/4464237339341",
+    "_rev" : "4464345408205",
+    "_key" : "4464237339341"
+  },
+  {
+    "fizz" : "buzz",
+    "_id" : "vertices/4464235307725",
+    "_rev" : "4464345604813",
+    "_key" : "4464235307725"
+  }
+]
+//Edges
+[
+  {
+    "_id" : "edges/4464345866957",
+    "_rev" : "4464345866957",
+    "_key" : "4464345866957",
+    "_from" : "vertices/4464237339341",
+    "_to" : "vertices/4464345735885"
+  },
+  {
+    "_id" : "edges/4464345998029",
+    "_rev" : "4464345998029",
+    "_key" : "4464345998029",
+    "_from" : "vertices/4464235307725",
+    "_to" : "vertices/4464345735885"
+  }
+]
+```
+This data gives us a the following graph:
+
+![Test data with a hub](https://mikewilliamson.files.wordpress.com/2016/04/hub_example.png)
+
+If we decide that `foo: "bar"` doesn't make sense as a vertex on it's own we can demote it to be an attribute on the connected vertices.
+
+```javascript
+> GraphMigration = require('./dist/main').default
+[Function: GraphMigration]
+> gm = new GraphMigration("test")
+gm.vertexToAttribute({foo: "bar"}, "test", {direction: "inbound"}).then(function(){ console.log("done") })
+```
+
+The result is this:
+
+```javascript
+//vertices
+[
+  {
+    "foo" : "bar",
+    "baz" : "quxx",
+    "_id" : "vertices/4464237339341",
+    "_rev" : "4464316441293",
+    "_key" : "4464237339341"
+  },
+  {
+    "foo" : "bar",
+    "fizz" : "buzz",
+    "_id" : "vertices/4464235307725",
+    "_rev" : "4464316310221",
+    "_key" : "4464235307725"
+  }
+]
+//edges
+[]
+```
 
 ### attributeToVertex
 
-```javascript
-attributeToVertex({year: 2004}, "mygraph", {direction: "inbound"})
-```
-The code above will create a new vertex with {year: 2004} and remove the
-attribute "year": 2004 from all the documents in the vertices
-collection, creating edges pointing to the new {year: 2004} vertex.
+This function would essentially put us back to where we started, by moving
+`foo: "bar"` back into a vertex and creating edges from the vertices it came
+from.
 
-The option direction: "inbound" could also obviously be "outbound" and
-the direction of the edges created would be reversed.
+```javascript
+gm.attributeToVertex({foo: "bar"}, "test", {direction: "inbound"}).then(function(){ console.log("done") })
+```
 
 Since we are creating vertices and edges, it would also be nice to
 be able to add extra attributes to be added. You can do that with the
 additional_attrs option:
 
 ```javascript
-attributeToVertex({founding_year: 2004}, "mygraph", {direction: "inbound",
-additional_attrs: {vertex: {foo: "bar"}, edge: {}}})
+gm.attributeToVertex({foo: "bar"}, "test", {direction: "inbound", additional_attrs: {vertex: {asdf: "qwerty"}, edge: {type: "useless"}}}).then(function(){ console.log("done") })
 ```
-### vertexToAttribute
-
-```javascript
-vertexToAttribute({name: "mysql"}, "mygraph", {direction: "inbound"})
-```
-
-This is aimed at getting rid of hubs (high degree vertices) in your data set.
-
-The first argument is an example that is assumed to uniquely identify
-the hub.
-
-Attributes from the hub will be copied to all neighbors with inbound
-edges (obviously {direction: "outbound"} is an option as well), with the
-neighbors attributes being retained in the case of duplication.
-
-The hub and any edges are then deleted.
 
 ### redirectEdges
 
+This function requires that you be specific with the start and end vertices. Make sure you pass in something with and `_id`attribute.
+
 ```javascript
-redirectEdges({_id: "vertices/1234"}, {_id: "vertices/5678"}, "mygraph", {direction: "inbound"})
+gm.redirectEdges({"baz" : "quxx", "_id" : "vertices/4464237339341"}, {"fizz": "buzz", "_id" : "vertices/4464235307725"}, "test", {direction: "inbound"})
 ```
 If you have edges pointing somewhere and want them pointing somewhere
-else, this is the function that does it. It expects to work with
-something with an `_id` attribute.
+else, this is the function that does it.
 
 ## TODO
 
+* Move vertices and edges to collections based on an attribute
 * Remove collection names from attributeToVertex
 
 This is all highly experimental.
