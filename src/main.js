@@ -181,7 +181,7 @@ async vertexToAttribute(example, graphName, options) {
   return await this.db.transaction({write: await this.allCollections(graphName)}, action, [example, graphName, options])
 }
 
-async attributeToVertex(example, graphName, options) {
+async attributeToVertex(example, graphName, edgeCollectionName, options) {
 
   var action = String((args) => {
 
@@ -189,7 +189,8 @@ async attributeToVertex(example, graphName, options) {
 
     var example = args[0]
     var graphName = args[1]
-    var options = args[2]
+    var edgeCollectionName = args[2]
+    var options = args[3]
 
     if(options.additional_attrs){
       var additional_vertex_attributes = (typeof options.additional_attrs.vertex === "undefined" ? {} : options.additional_attrs.vertex);
@@ -199,23 +200,35 @@ async attributeToVertex(example, graphName, options) {
       var additional_edge_attributes = {}
     }
 
-    var removeAttributesAQL = `
-      FOR vertex IN vertices
-      FILTER MATCHES(vertex, @example)
-      REPLACE vertex WITH UNSET(vertex, ATTRIBUTES(@example)) IN @@collection
-      RETURN NEW
+    //Because we don't know which collection this vertex is in
+    //we pull it using GRAPH_VERTICES
+    var matchingVerticesAQL = `
+      FOR vertex IN GRAPH_VERTICES(@graph, @example)
+        RETURN vertex
     `
-    //All the vertices that have had an attribute removed
-    //XXX: hardcoding collection names
-    var verticesWithAttrsRemoved = db._query(removeAttributesAQL, {example: example, "@collection": "vertices"}).toArray()
+    var matchingVertices = db._query(matchingVerticesAQL, {example: example, graph: graphName}).toArray()
+
+    //Declare collection here so we can use it when we create the vertex
+    var collection = null
+    var verticesWithAttrsRemoved = []
+    matchingVertices.forEach(function(vertex){
+      //split the id and keep the collection name
+      collection = vertex._id.split("/")[0]
+      var removeAttributesAQL = `
+        REPLACE @vertex WITH UNSET(@vertex, ATTRIBUTES(@example)) IN @@collection
+        RETURN NEW
+      `
+      //All the vertices that have had an attribute removed
+      var vertexWithAttrsRemoved = db._query(removeAttributesAQL, {example: example, vertex: vertex, "@collection": collection}).next()
+      verticesWithAttrsRemoved.push(vertexWithAttrsRemoved)
+    })
 
     var createVertexAQL = `
     INSERT MERGE(@additional_attrs, @attrs)
     IN @@collection
       RETURN NEW
     `
-    //XXX: hardcoding collection names
-    var newVertex = db._query(createVertexAQL, {attrs: example, additional_attrs: additional_vertex_attributes, "@collection": "vertices"}).toArray()[0]
+    var newVertex = db._query(createVertexAQL, {attrs: example, additional_attrs: additional_vertex_attributes, "@collection": collection}).toArray()[0]
 
     //verticesWithAttrsRemoved is an array of all the documents we removed the
     //attribute from.
@@ -238,13 +251,12 @@ async attributeToVertex(example, graphName, options) {
           RETURN NEW
       `
     }
-    //XXX: hardcoding collection names
-    var edges = db._query(createEdgesAQL, {verticesWithAttrsRemoved: verticesWithAttrsRemoved, additional_attrs: additional_edge_attributes,  newVertexID: newVertex._id, "@collection": 'edges'}).toArray()
+    var edges = db._query(createEdgesAQL, {verticesWithAttrsRemoved: verticesWithAttrsRemoved, additional_attrs: additional_edge_attributes,  newVertexID: newVertex._id, "@collection": edgeCollectionName}).toArray()
 
     //In theory all went well.
     return newVertex
   })
-  return await this.db.transaction({write: await this.allCollections(graphName)}, action, [example, graphName, options])
+  return await this.db.transaction({write: await this.allCollections(graphName)}, action, [example, graphName, edgeCollectionName, options])
 };
 
 }

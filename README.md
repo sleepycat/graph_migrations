@@ -113,7 +113,8 @@ This function would essentially put us back to where we started, by moving
 from.
 
 ```javascript
-gm.attributeToVertex({foo: "bar"}, "test", {direction: "inbound"}).then(function(){ console.log("done") })
+//arguments: example, graph name, edge Collection to save in, options
+gm.attributeToVertex({foo: "bar"}, "test", "edges", {direction: "inbound"}).then(function(){ console.log("done") })
 ```
 
 Since we are creating vertices and edges, it would also be nice to
@@ -121,7 +122,7 @@ be able to add extra attributes to be added. You can do that with the
 additional_attrs option:
 
 ```javascript
-gm.attributeToVertex({foo: "bar"}, "test", {direction: "inbound", additional_attrs: {vertex: {asdf: "qwerty"}, edge: {type: "useless"}}}).then(function(){ console.log("done") })
+gm.attributeToVertex({foo: "bar"}, "test", "edges", {direction: "inbound", additional_attrs: {vertex: {asdf: "qwerty"}, edge: {type: "useless"}}}).then(function(){ console.log("done") })
 ```
 
 ### redirectEdges
@@ -136,8 +137,8 @@ else, this is the function that does it.
 
 ## TODO
 
+* Flip edge function
 * Move vertices and edges to collections based on an attribute
-* Remove collection names from attributeToVertex
 
 This is all highly experimental.
 Ideas and pull requests welcome.

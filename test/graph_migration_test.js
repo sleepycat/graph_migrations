@@ -117,7 +117,7 @@ describe('GraphMigration', () => {
     it('can reify an attribute with and inbound edge', async () => {
       //transform the test data by reifying founding_year
       let gm = new GraphMigration("test")
-      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "inbound"})
+      await gm.attributeToVertex({founding_year: 2004}, "test", "edges", {direction: "inbound"})
       //get the new vertex
       let newVertex = await vertexLike({founding_year: 2004})
       //Can we walk inbound edges and reach shopify?
@@ -130,7 +130,7 @@ describe('GraphMigration', () => {
     it('can reify an attribute and add additional attributes to the inbound edge', async () => {
       //transform the test data by reifying founding_year
       let gm = new GraphMigration("test")
-      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "inbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
+      await gm.attributeToVertex({founding_year: 2004}, "test", "edges", {direction: "inbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
       //get the new vertex
       let newVertex = await vertexLike({founding_year: 2004})
       //Can we walk inbound edges and reach shopify?
@@ -143,7 +143,7 @@ describe('GraphMigration', () => {
     it('can reify an attribute and add additional attributes to the outbound edge', async () => {
       //transform the test data by reifying founding_year
       let gm = new GraphMigration("test")
-      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
+      await gm.attributeToVertex({founding_year: 2004}, "test", "edges", {direction: "outbound", additional_attrs: {vertex: {}, edge: {foo: "bar"}}})
       //get the new vertex
       let newVertex = await vertexLike({founding_year: 2004})
       //Can we walk inbound edges and reach shopify?
@@ -156,7 +156,7 @@ describe('GraphMigration', () => {
     it('can reify an attribute and add additional attributes to the vertex', async () => {
       //transform the test data by reifying founding_year
       let gm = new GraphMigration("test")
-      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {asdf: "qwerty"}}})
+      await gm.attributeToVertex({founding_year: 2004}, "test", "edges", {direction: "outbound", additional_attrs: {vertex: {asdf: "qwerty"}}})
       //get the new vertex
       let results = await vertexLike({asdf: "qwerty"})
       let newVertex = results[0]
@@ -166,7 +166,7 @@ describe('GraphMigration', () => {
     it('does not explode when additional_attrs is not present', async () => {
       //transform the test data by reifying founding_year
       let gm = new GraphMigration("test")
-      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "inbound"})
+      await gm.attributeToVertex({founding_year: 2004}, "test", "edges", {direction: "inbound"})
       //get the new vertex
       let newVertex = await vertexLike({founding_year: 2004})
       //Can we walk inbound edges and reach shopify?
@@ -179,7 +179,7 @@ describe('GraphMigration', () => {
     it('can reify an attribute with and outbound edge', async () => {
       //transform the test data by reifying founding_year
       let gm = new GraphMigration("test")
-      await gm.attributeToVertex({founding_year: 2004}, "test", {direction: "outbound", additional_attrs: {vertex: {}, edge: {}}})
+      await gm.attributeToVertex({founding_year: 2004}, "test", "edges", {direction: "outbound"})
       //get the new vertex
       let newVertex = await vertexLike({founding_year: 2004})
       //Can we walk inbound edges and reach shopify?
