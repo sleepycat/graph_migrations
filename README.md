@@ -135,6 +135,17 @@ gm.redirectEdges({"baz" : "quxx", "_id" : "vertices/4464237339341"}, {"fizz": "b
 If you have edges pointing somewhere and want them pointing somewhere
 else, this is the function that does it.
 
+### mergeVertices
+
+Given two vertices, this function merges the first onto the second. This implies that where both vertices have an attribute with different values, the value from the first vertex will survive the merge.
+
+```javascript
+gm.mergeVertices({"baz" : "quxx", "_id" : "vertices/4464237339341"}, {"fizz": "buzz", "_id" : "vertices/4464235307725"}, "test")
+```
+
+Any edges that were pointing to the first vertex will now point to the
+second.
+
 ## TODO
 
 * Flip edge function
