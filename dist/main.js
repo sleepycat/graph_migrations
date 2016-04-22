@@ -295,7 +295,7 @@ var GraphMigration = function () {
   }, {
     key: 'attributeToVertex',
     value: function () {
-      var ref = _asyncToGenerator(regeneratorRuntime.mark(function _callee5(example, graphName, options) {
+      var ref = _asyncToGenerator(regeneratorRuntime.mark(function _callee5(example, graphName, edgeCollectionName, options) {
         var action;
         return regeneratorRuntime.wrap(function _callee5$(_context5) {
           while (1) {
@@ -307,24 +307,36 @@ var GraphMigration = function () {
 
                   var example = args[0];
                   var graphName = args[1];
-                  var options = args[2];
+                  var edgeCollectionName = args[2];
+                  var options = args[3];
 
                   if (options.additional_attrs) {
-                    var additional_vertex_attributes = options.additional_attrs.vertex;
-                    var additional_edge_attributes = options.additional_attrs.edge;
+                    var additional_vertex_attributes = typeof options.additional_attrs.vertex === "undefined" ? {} : options.additional_attrs.vertex;
+                    var additional_edge_attributes = typeof options.additional_attrs.edge === "undefined" ? {} : options.additional_attrs.edge;
                   } else {
                     var additional_vertex_attributes = {};
                     var additional_edge_attributes = {};
                   }
 
-                  var removeAttributesAQL = '\n      FOR vertex IN vertices\n      FILTER MATCHES(vertex, @example)\n      REPLACE vertex WITH UNSET(vertex, ATTRIBUTES(@example)) IN @@collection\n      RETURN NEW\n    ';
-                  //All the vertices that have had an attribute removed
-                  //XXX: hardcoding collection names
-                  var verticesWithAttrsRemoved = db._query(removeAttributesAQL, { example: example, "@collection": "vertices" }).toArray();
+                  //Because we don't know which collection this vertex is in
+                  //we pull it using GRAPH_VERTICES
+                  var matchingVerticesAQL = '\n      FOR vertex IN GRAPH_VERTICES(@graph, @example)\n        RETURN vertex\n    ';
+                  var matchingVertices = db._query(matchingVerticesAQL, { example: example, graph: graphName }).toArray();
+
+                  //Declare collection here so we can use it when we create the vertex
+                  var collection = null;
+                  var verticesWithAttrsRemoved = [];
+                  matchingVertices.forEach(function (vertex) {
+                    //split the id and keep the collection name
+                    collection = vertex._id.split("/")[0];
+                    var removeAttributesAQL = '\n        REPLACE @vertex WITH UNSET(@vertex, ATTRIBUTES(@example)) IN @@collection\n        RETURN NEW\n      ';
+                    //All the vertices that have had an attribute removed
+                    var vertexWithAttrsRemoved = db._query(removeAttributesAQL, { example: example, vertex: vertex, "@collection": collection }).next();
+                    verticesWithAttrsRemoved.push(vertexWithAttrsRemoved);
+                  });
 
                   var createVertexAQL = '\n    INSERT MERGE(@additional_attrs, @attrs)\n    IN @@collection\n      RETURN NEW\n    ';
-                  //XXX: hardcoding collection names
-                  var newVertex = db._query(createVertexAQL, { attrs: example, additional_attrs: additional_vertex_attributes, "@collection": "vertices" }).toArray()[0];
+                  var newVertex = db._query(createVertexAQL, { attrs: example, additional_attrs: additional_vertex_attributes, "@collection": collection }).toArray()[0];
 
                   //verticesWithAttrsRemoved is an array of all the documents we removed the
                   //attribute from.
@@ -335,8 +347,7 @@ var GraphMigration = function () {
                   } else {
                     var createEdgesAQL = '\n      FOR vertex IN @verticesWithAttrsRemoved\n        LET merged = (MERGE({ _from: @newVertexID, _to: vertex._id }, @additional_attrs))\n        INSERT merged\n        IN @@collection\n          RETURN NEW\n      ';
                   }
-                  //XXX: hardcoding collection names
-                  var edges = db._query(createEdgesAQL, { verticesWithAttrsRemoved: verticesWithAttrsRemoved, additional_attrs: additional_edge_attributes, newVertexID: newVertex._id, "@collection": 'edges' }).toArray();
+                  var edges = db._query(createEdgesAQL, { verticesWithAttrsRemoved: verticesWithAttrsRemoved, additional_attrs: additional_edge_attributes, newVertexID: newVertex._id, "@collection": edgeCollectionName }).toArray();
 
                   //In theory all went well.
                   return newVertex;
@@ -351,7 +362,7 @@ var GraphMigration = function () {
                   write: _context5.t1
                 };
                 _context5.t3 = action;
-                _context5.t4 = [example, graphName, options];
+                _context5.t4 = [example, graphName, edgeCollectionName, options];
                 _context5.next = 10;
                 return _context5.t0.transaction.call(_context5.t0, _context5.t2, _context5.t3, _context5.t4);
 
@@ -366,7 +377,109 @@ var GraphMigration = function () {
         }, _callee5, this);
       }));
 
-      return function attributeToVertex(_x11, _x12, _x13) {
+      return function attributeToVertex(_x11, _x12, _x13, _x14) {
+        return ref.apply(this, arguments);
+      };
+    }()
+  }, {
+    key: 'mergeVertices',
+    value: function () {
+      var ref = _asyncToGenerator(regeneratorRuntime.mark(function _callee6(exampleA, exampleB, graphName) {
+        var action;
+        return regeneratorRuntime.wrap(function _callee6$(_context6) {
+          while (1) {
+            switch (_context6.prev = _context6.next) {
+              case 0:
+                action = String(function (args) {
+
+                  var db = require("internal").db;
+                  var exampleA = args[0];
+                  var exampleB = args[1];
+                  var graphName = args[2];
+                  //Check we have examples to work from
+                  if (!exampleA) throw new Error('The first argument to mergeVertices was ' + vertexA);
+                  if (!exampleB) throw new Error('The second argument to mergeVertices was ' + vertexB);
+
+                  //Use exampleA to find a vertex
+                  var exampleACursor = db._query('FOR v IN GRAPH_VERTICES(@graph, @example) RETURN v', { example: exampleA, graph: graphName });
+                  //If the example matches more than one vertex, that's bad
+                  if (exampleACursor.count() > 1) throw new Error('The first example was not specific enough and matched more than one document.');
+                  //We now have our vertex to work from
+                  var vertexA = exampleACursor.toArray()[0];
+
+                  //Use exampleA to find a vertex
+                  var exampleBCursor = db._query('FOR v IN GRAPH_VERTICES(@graph, @example) RETURN v', { example: exampleB, graph: graphName });
+                  //If the example matches more than one vertex, that's bad
+                  if (exampleBCursor.count() > 1) throw new Error('The second example was not specific enough and matched more than one document.');
+                  var vertexB = exampleBCursor.toArray()[0];
+
+                  //We now need the edges for vertexA so we can redirect them to B
+                  var getEdgesAQL = '\n          FOR edge IN GRAPH_EDGES(@graph, @vertex, {includeData: true})\n            RETURN edge\n      ';
+                  var vertexAedgesCursor = db._query(getEdgesAQL, { graph: graphName, vertex: vertexA });
+
+                  //Iterate over A's edges
+                  //making a new one pointing to/from B
+                  //and then deleting the current edge
+                  while (vertexAedgesCursor.hasNext()) {
+                    var edge = vertexAedgesCursor.next();
+                    //This is gross but it's the easiest way to clone an object...
+                    var edgeWithoutIDs = JSON.parse(JSON.stringify(edge));
+                    var collection = edge._id.split('/')[0];
+                    //pick off Arango's internal attributes
+                    delete edgeWithoutIDs._id;
+                    delete edgeWithoutIDs._rev;
+                    delete edgeWithoutIDs._key;
+
+                    //Change the to/from to point to B
+                    if (edge._to == vertexA._id) {
+                      edgeWithoutIDs._to = vertexB._id;
+                    }
+                    if (edge._from == vertexA._id) {
+                      edgeWithoutIDs._from = vertexB._id;
+                    }
+
+                    var upsertEdgeAQL = '\n         INSERT @edge IN @@collection RETURN NEW\n        ';
+                    var newEdge = db._query(upsertEdgeAQL, { edge: edgeWithoutIDs, '@collection': collection }).toArray()[0];
+
+                    db._query('REMOVE @edge IN @@collection', { edge: edge, '@collection': collection });
+                  }
+
+                  //Merge A onto B
+                  var vertexBCollection = vertexB._id.split('/')[0];
+                  var mergeAQL = 'UPDATE @vertexB WITH MERGE(@vertexA, @vertexB) IN @@collection RETURN NEW';
+                  var merged = db._query(mergeAQL, { vertexA: vertexA, vertexB: vertexB, '@collection': vertexBCollection }).toArray()[0];
+
+                  //Remove vertexA
+                  var vertexBCollection = vertexA._id.split('/')[0];
+                  db._query('REMOVE @vertex IN @@collection', { vertex: vertexA, '@collection': vertexBCollection });
+                  return merged;
+                });
+                _context6.t0 = this.db;
+                _context6.next = 4;
+                return this.allCollections(graphName);
+
+              case 4:
+                _context6.t1 = _context6.sent;
+                _context6.t2 = {
+                  write: _context6.t1
+                };
+                _context6.t3 = action;
+                _context6.t4 = [exampleA, exampleB, graphName];
+                _context6.next = 10;
+                return _context6.t0.transaction.call(_context6.t0, _context6.t2, _context6.t3, _context6.t4);
+
+              case 10:
+                return _context6.abrupt('return', _context6.sent);
+
+              case 11:
+              case 'end':
+                return _context6.stop();
+            }
+          }
+        }, _callee6, this);
+      }));
+
+      return function mergeVertices(_x15, _x16, _x17) {
         return ref.apply(this, arguments);
       };
     }()

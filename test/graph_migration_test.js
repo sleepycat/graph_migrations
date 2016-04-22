@@ -195,14 +195,8 @@ describe('GraphMigration', () => {
   describe('GraphMigration.mergeVertices', () => {
 
     it('merges the first vertex into the second', async () => {
-      let shopifyResults = await vertexLike({name: "Shopify"})
-      let magmicResults = await vertexLike({name: "Magmic Inc"})
-      let shopify = shopifyResults[0]
-      let magmic = magmicResults[0]
-
       let gm = new GraphMigration("test")
-
-      let merged = await gm.mergeVertices(magmic, shopify, 'test')
+      let merged = await gm.mergeVertices({name: "Magmic Inc"},{name: "Shopify"}, 'test')
       let afterAQL = aqlQuery`
       FOR vertex IN GRAPH_NEIGHBORS("test", {name: "Shopify"}, {direction: "outbound", maxDepth: 1, edgeExamples: [{type: "works_in"}], includeData: true})
         RETURN vertex

@@ -137,10 +137,10 @@ else, this is the function that does it.
 
 ### mergeVertices
 
-Given two vertices, this function merges the first onto the second. This implies that where both vertices have an attribute with different values, the value from the first vertex will survive the merge.
+Given two vertex examples, this function merges the first onto the second. This implies that where both vertices have an attribute with different values, the value from the first vertex will survive the merge.
 
 ```javascript
-gm.mergeVertices({"baz" : "quxx", "_id" : "vertices/4464237339341"}, {"fizz": "buzz", "_id" : "vertices/4464235307725"}, "test")
+gm.mergeVertices({"address" : "11305 4 Points Drive #300, Austin, TX 78726, USA"}, {"address" : "11305 4 Points Dr, Austin, TX 78726, USA"}, "test").then(function(){ console.log("done") })
 ```
 
 Any edges that were pointing to the first vertex will now point to the

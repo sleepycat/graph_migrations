@@ -259,25 +259,41 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
   return await this.db.transaction({write: await this.allCollections(graphName)}, action, [example, graphName, edgeCollectionName, options])
 };
 
-  async mergeVertices(vertexA, vertexB, graphName) {
+  async mergeVertices(exampleA, exampleB, graphName) {
 
     var action = String((args) => {
 
       var db = require("internal").db;
-      var vertexA = args[0]
-      var vertexB = args[1]
+      var exampleA = args[0]
+      var exampleB = args[1]
       var graphName = args[2]
-      if(!vertexA) throw new Error(`The first argument to mergeVertices was ${vertexA}`)
-      if(!vertexB) throw new Error(`The second argument to mergeVertices was ${vertexB}`)
-      if(typeof vertexA._id == 'undefined') throw new Error(`The first argument to mergeVertices had no _id property`)
-      if(typeof vertexB._id == 'undefined') throw new Error(`The second argument to mergeVertices had no _id property`)
+      //Check we have examples to work from
+      if(!exampleA) throw new Error(`The first argument to mergeVertices was ${vertexA}`)
+      if(!exampleB) throw new Error(`The second argument to mergeVertices was ${vertexB}`)
 
+      //Use exampleA to find a vertex
+      var exampleACursor = db._query(`FOR v IN GRAPH_VERTICES(@graph, @example) RETURN v`, {example: exampleA, graph: graphName})
+      //If the example matches more than one vertex, that's bad
+      if(exampleACursor.count() > 1) throw new Error(`The first example was not specific enough and matched more than one document.`)
+      //We now have our vertex to work from
+      var vertexA = exampleACursor.toArray()[0]
+
+      //Use exampleA to find a vertex
+      var exampleBCursor = db._query(`FOR v IN GRAPH_VERTICES(@graph, @example) RETURN v`, {example: exampleB, graph: graphName})
+      //If the example matches more than one vertex, that's bad
+      if(exampleBCursor.count() > 1) throw new Error(`The second example was not specific enough and matched more than one document.`)
+      var vertexB = exampleBCursor.toArray()[0]
+
+      //We now need the edges for vertexA so we can redirect them to B
       var getEdgesAQL = `
           FOR edge IN GRAPH_EDGES(@graph, @vertex, {includeData: true})
             RETURN edge
       `
       var vertexAedgesCursor = db._query(getEdgesAQL, {graph: graphName, vertex: vertexA})
 
+      //Iterate over A's edges
+      //making a new one pointing to/from B
+      //and then deleting the current edge
       while(vertexAedgesCursor.hasNext()){
         var edge = vertexAedgesCursor.next()
         //This is gross but it's the easiest way to clone an object...
@@ -315,7 +331,7 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
       return merged
     })
 
-    return await this.db.transaction({write: await this.allCollections(graphName)}, action, [vertexA, vertexB, graphName])
+    return await this.db.transaction({write: await this.allCollections(graphName)}, action, [exampleA, exampleB, graphName])
   }
 
 }
