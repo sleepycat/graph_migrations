@@ -10,6 +10,14 @@ describe('GraphMigration', () => {
 
   let db = arangojs({databaseName: "test", url: "http://localhost:8529"})
 
+  let vertexLike = async (example) => {
+    let aql = aqlQuery`
+    FOR v IN vertices FILTER MATCHES(v, ${example}) RETURN v
+    `
+    let cursor = await db.query(aql)
+    return cursor.all()
+  }
+
 
   beforeEach(async () => {
     let vertexCollection = await db.collection('vertices')
@@ -106,13 +114,6 @@ describe('GraphMigration', () => {
 
   describe('GraphMigration.attributeToVertex', () => {
 
-    let vertexLike = async (example) => {
-      let aql = aqlQuery`
-      FOR v IN vertices FILTER MATCHES(v, ${example}) RETURN v
-      `
-      let cursor = await db.query(aql)
-      return cursor.all()
-    }
 
     it('can reify an attribute with and inbound edge', async () => {
       //transform the test data by reifying founding_year
@@ -187,6 +188,29 @@ describe('GraphMigration', () => {
       let result = await db.query(aql)
       let reachableVertex = await result.next()
       assert.equal("Shopify", reachableVertex.name)
+    })
+
+  })
+
+  describe('GraphMigration.mergeVertices', () => {
+
+    it('merges the first vertex into the second', async () => {
+      let shopifyResults = await vertexLike({name: "Shopify"})
+      let magmicResults = await vertexLike({name: "Magmic Inc"})
+      let shopify = shopifyResults[0]
+      let magmic = magmicResults[0]
+
+      let gm = new GraphMigration("test")
+
+      let merged = await gm.mergeVertices(magmic, shopify, 'test')
+      let afterAQL = aqlQuery`
+      FOR vertex IN GRAPH_NEIGHBORS("test", {name: "Shopify"}, {direction: "outbound", maxDepth: 1, edgeExamples: [{type: "works_in"}], includeData: true})
+        RETURN vertex
+
+      `
+      let afterCursor = await db.query(afterAQL)
+      let officesAfter = await afterCursor.all()
+      assert.equal(officesAfter.length, 4)
     })
 
   })

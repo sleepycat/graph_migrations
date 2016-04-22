@@ -259,6 +259,65 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
   return await this.db.transaction({write: await this.allCollections(graphName)}, action, [example, graphName, edgeCollectionName, options])
 };
 
+  async mergeVertices(vertexA, vertexB, graphName) {
+
+    var action = String((args) => {
+
+      var db = require("internal").db;
+      var vertexA = args[0]
+      var vertexB = args[1]
+      var graphName = args[2]
+      if(!vertexA) throw new Error(`The first argument to mergeVertices was ${vertexA}`)
+      if(!vertexB) throw new Error(`The second argument to mergeVertices was ${vertexB}`)
+      if(typeof vertexA._id == 'undefined') throw new Error(`The first argument to mergeVertices had no _id property`)
+      if(typeof vertexB._id == 'undefined') throw new Error(`The second argument to mergeVertices had no _id property`)
+
+      var getEdgesAQL = `
+          FOR edge IN GRAPH_EDGES(@graph, @vertex, {includeData: true})
+            RETURN edge
+      `
+      var vertexAedgesCursor = db._query(getEdgesAQL, {graph: graphName, vertex: vertexA})
+
+      while(vertexAedgesCursor.hasNext()){
+        var edge = vertexAedgesCursor.next()
+        //This is gross but it's the easiest way to clone an object...
+        var edgeWithoutIDs = JSON.parse(JSON.stringify(edge))
+        var collection = edge._id.split('/')[0]
+        //pick off Arango's internal attributes
+        delete edgeWithoutIDs._id
+        delete edgeWithoutIDs._rev
+        delete edgeWithoutIDs._key
+
+        //Change the to/from to point to B
+        if(edge._to == vertexA._id) {
+          edgeWithoutIDs._to = vertexB._id
+        }
+        if(edge._from == vertexA._id) {
+          edgeWithoutIDs._from = vertexB._id
+        }
+
+        var upsertEdgeAQL = `
+         INSERT @edge IN @@collection RETURN NEW
+        `
+        var newEdge = db._query(upsertEdgeAQL, {edge: edgeWithoutIDs, '@collection': collection}).toArray()[0]
+
+        db._query(`REMOVE @edge IN @@collection`, {edge: edge, '@collection': collection})
+      }
+
+      //Merge A onto B
+      var vertexBCollection = vertexB._id.split('/')[0]
+      var mergeAQL = `UPDATE @vertexB WITH MERGE(@vertexA, @vertexB) IN @@collection RETURN NEW`
+      var merged = db._query(mergeAQL, {vertexA: vertexA, vertexB: vertexB, '@collection': vertexBCollection}).toArray()[0]
+
+      //Remove vertexA
+      var vertexBCollection = vertexA._id.split('/')[0]
+      db._query(`REMOVE @vertex IN @@collection`, {vertex: vertexA, '@collection': vertexBCollection})
+      return merged
+    })
+
+    return await this.db.transaction({write: await this.allCollections(graphName)}, action, [vertexA, vertexB, graphName])
+  }
+
 }
 
 // TODO: Revisit this but use graphs instead of collections.
