@@ -146,6 +146,21 @@ gm.mergeVertices({"address" : "11305 4 Points Drive #300, Austin, TX 78726, USA"
 Any edges that were pointing to the first vertex will now point to the
 second.
 
+### eagerDelete
+
+Deleting vertices can sometimes leave some orphan vertices lying around.
+If we want to delete Bob from the following graph, Dave and Charlie
+would have nothing to connect them to the graph.
+
+![eagerDelete](https://mikewilliamson.files.wordpress.com/2016/04/screenshot-from-2016-04-06-10-55-54.png)
+
+`eagerDelete` lets you specify a vertex to be deleted and checks it's neighbors to see if they
+will be orphaned by the deletion. If so, it deletes them too.
+
+```javascript
+gm.eagerDelete({name: "Bob"}, "knows_graph")
+```
+
 ## TODO
 
 * Flip edge function

@@ -483,11 +483,90 @@ var GraphMigration = function () {
         return ref.apply(this, arguments);
       };
     }()
+  }, {
+    key: 'eagerDelete',
+    value: function () {
+      var ref = _asyncToGenerator(regeneratorRuntime.mark(function _callee7(example, graphName) {
+        var action;
+        return regeneratorRuntime.wrap(function _callee7$(_context7) {
+          while (1) {
+            switch (_context7.prev = _context7.next) {
+              case 0:
+                action = String(function (args) {
+
+                  var example = args[0];
+                  var graphName = args[1];
+
+                  var db = require("internal").db;
+                  var graph_module = require("@arangodb/general-graph");
+                  var graph = graph_module._graph(graphName);
+
+                  var exampleCursor = db._query('FOR v IN GRAPH_VERTICES(@graph, @example) RETURN v', { example: example, graph: graphName });
+                  //If the example matches more than one vertex, that's bad
+                  if (exampleCursor.count() > 1) throw new Error('The example was not specific enough and matched more than one document.');
+                  var vertex = exampleCursor.toArray()[0];
+
+                  var getNeighborsAQL = '\n          FOR vertex IN GRAPH_NEIGHBORS(@graph, @vertex, {includeData: true})\n            RETURN vertex\n      ';
+                  var neighborsCursor = db._query(getNeighborsAQL, { graph: graphName, vertex: vertex });
+
+                  //Iterate over the neighbors
+                  //If the neighbor vertex only linked to the vertex we are deleting
+                  //get rid of it.
+                  var ids = null;
+                  while (neighborsCursor.hasNext()) {
+                    var neighbor = neighborsCursor.next();
+                    var neighborIDsAQL = '\n            FOR vertex IN GRAPH_NEIGHBORS(@graph, @vertex, {})\n              RETURN vertex\n        ';
+                    var neighborIDs = db._query(neighborIDsAQL, { graph: graphName, vertex: neighbor }).toArray();
+                    if (neighborIDs.length == 1) {
+                      if (neighborIDs[0] == vertex._id) {
+                        //Only a single neighbor? That neighbors id is also the id
+                        //of our vertex to delete?
+                        //This vertex would be orphaned by our deletion.
+                        var collection = neighborIDs[0].split('/')[0];
+                        graph[collection].remove(neighbor._id);
+                      }
+                    }
+                  }
+
+                  var vertexCollection = vertex._id.split('/')[0];
+                  //Use the general graph module to delete
+                  //because it deletes the edges for us:
+                  graph[vertexCollection].remove(vertex._id);
+                  return vertex;
+                });
+                _context7.t0 = this.db;
+                _context7.next = 4;
+                return this.allCollections(graphName);
+
+              case 4:
+                _context7.t1 = _context7.sent;
+                _context7.t2 = {
+                  write: _context7.t1
+                };
+                _context7.t3 = action;
+                _context7.t4 = [example, graphName];
+                _context7.next = 10;
+                return _context7.t0.transaction.call(_context7.t0, _context7.t2, _context7.t3, _context7.t4);
+
+              case 10:
+                return _context7.abrupt('return', _context7.sent);
+
+              case 11:
+              case 'end':
+                return _context7.stop();
+            }
+          }
+        }, _callee7, this);
+      }));
+
+      return function eagerDelete(_x18, _x19) {
+        return ref.apply(this, arguments);
+      };
+    }()
   }]);
 
   return GraphMigration;
 }();
-
 // TODO: Revisit this but use graphs instead of collections.
 // let removeAttribute = async (example, collection) => {
 //   //Then remove the attribute from existing vertices

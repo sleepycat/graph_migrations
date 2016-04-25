@@ -209,5 +209,22 @@ describe('GraphMigration', () => {
 
   })
 
+  describe('GraphMigration.eagerDelete', () => {
+
+    it("deletes a vertex, it's edges and any vertices that would be orphaned by that deletion", async () => {
+      let gm = new GraphMigration("test")
+      let deleted = await gm.eagerDelete({name: "Shopify"}, 'test')
+      let afterAQL = aqlQuery`
+        LET locations = (FOR v IN vertices FILTER v.type == "location" RETURN v)
+        RETURN LENGTH(locations)
+      `
+      let afterCursor = await db.query(afterAQL)
+      let locations = await afterCursor.all()
+
+      assert.equal(locations.length, 1)
+    })
+
+  })
+
 })
 

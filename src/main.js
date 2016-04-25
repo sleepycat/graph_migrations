@@ -334,8 +334,62 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
     return await this.db.transaction({write: await this.allCollections(graphName)}, action, [exampleA, exampleB, graphName])
   }
 
-}
 
+  async eagerDelete(example, graphName) {
+
+    var action = String((args) => {
+
+      var example = args[0]
+      var graphName = args[1]
+
+      var db = require("internal").db;
+      var graph_module = require("@arangodb/general-graph")
+      var graph = graph_module._graph(graphName)
+
+      var exampleCursor = db._query(`FOR v IN GRAPH_VERTICES(@graph, @example) RETURN v`, {example: example, graph: graphName})
+      //If the example matches more than one vertex, that's bad
+      if(exampleCursor.count() > 1) throw new Error(`The example was not specific enough and matched more than one document.`)
+      var vertex = exampleCursor.toArray()[0]
+
+      var getNeighborsAQL = `
+          FOR vertex IN GRAPH_NEIGHBORS(@graph, @vertex, {includeData: true})
+            RETURN vertex
+      `
+      var neighborsCursor = db._query(getNeighborsAQL, {graph: graphName, vertex: vertex})
+
+      //Iterate over the neighbors
+      //If the neighbor vertex only linked to the vertex we are deleting
+      //get rid of it.
+      var ids = null
+      while(neighborsCursor.hasNext()){
+        var neighbor = neighborsCursor.next()
+        var neighborIDsAQL = `
+            FOR vertex IN GRAPH_NEIGHBORS(@graph, @vertex, {})
+              RETURN vertex
+        `
+        var neighborIDs = db._query(neighborIDsAQL, {graph: graphName, vertex: neighbor}).toArray()
+        if(neighborIDs.length == 1){
+          if(neighborIDs[0] == vertex._id){
+            //Only a single neighbor? That neighbors id is also the id
+            //of our vertex to delete?
+            //This vertex would be orphaned by our deletion.
+            var collection = neighborIDs[0].split('/')[0]
+            graph[collection].remove(neighbor._id)
+          }
+        }
+      }
+
+      var vertexCollection = vertex._id.split('/')[0]
+      //Use the general graph module to delete
+      //because it deletes the edges for us:
+      graph[vertexCollection].remove(vertex._id)
+      return vertex
+    })
+
+    return await this.db.transaction({write: await this.allCollections(graphName)}, action, [example, graphName])
+  }
+
+}
 // TODO: Revisit this but use graphs instead of collections.
 // let removeAttribute = async (example, collection) => {
 //   //Then remove the attribute from existing vertices
