@@ -196,7 +196,7 @@ describe('GraphMigration', () => {
 
     it('merges the first vertex into the second', async () => {
       let gm = new GraphMigration("test")
-      let merged = await gm.mergeVertices({name: "Magmic Inc"},{name: "Shopify"}, 'test')
+      let merged = await gm.mergeVertices({name: "Shopify"}, {name: "Magmic Inc"}, 'test')
       let afterAQL = aqlQuery`
       FOR vertex IN GRAPH_NEIGHBORS("test", {name: "Shopify"}, {direction: "outbound", maxDepth: 1, edgeExamples: [{type: "works_in"}], includeData: true})
         RETURN vertex

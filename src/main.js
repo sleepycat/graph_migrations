@@ -322,7 +322,7 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
 
       //Merge A onto B
       var vertexBCollection = vertexB._id.split('/')[0]
-      var mergeAQL = `UPDATE @vertexB WITH MERGE(@vertexA, @vertexB) IN @@collection RETURN NEW`
+      var mergeAQL = `UPDATE @vertexB WITH MERGE(@vertexB, @vertexA) IN @@collection RETURN NEW`
       var merged = db._query(mergeAQL, {vertexA: vertexA, vertexB: vertexB, '@collection': vertexBCollection}).toArray()[0]
 
       //Remove vertexA
