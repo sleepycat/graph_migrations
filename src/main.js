@@ -389,7 +389,7 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
     return await this.db.transaction({write: await this.allCollections(graphName)}, action, [example, graphName])
   }
 
-  async splitCollection(attribute, collectionName) {
+  async splitEdgeCollection(attribute, collectionName) {
 
     let aql = `
     FOR document in @@collection FILTER HAS(document, @attr) RETURN DISTINCT document[@attr]
@@ -404,18 +404,10 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
     attributeValues.forEach(async (attributeValue) => {
       // Is the source collection a document collection
       // or and edge collection?
-      if(sourceCollection.type == 3) {
-        //we are copying out of an edge collection
-        // Create a new edge collection named after the attribute value
-        try{
+      // Create a new edge collection named after the attribute value
+      try{
         destinationCollection = await that.db.edgeCollection(attributeValue)
-        } catch(e) {
-        }
-      }
-      if(sourceCollection.type == 2) {
-        //we are copying out of an document collection
-        // Create a new document collection named after the attribute value
-        destinationCollection = that.db.collection(attributeValue)
+      } catch(e) {
       }
 
 
@@ -430,9 +422,9 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
       //copy each doc to new collection
       let copyAQL = `
       FOR document IN @@sourceCollection
-         FILTER document[@attr] == @attrVal
-          INSERT UNSET(document, '_id', '_key', '_rev') IN @@destinationCollection
-          REMOVE document IN @@sourceCollection
+      FILTER document[@attr] == @attrVal
+      INSERT UNSET(document, '_id', '_key', '_rev') IN @@destinationCollection
+      REMOVE document IN @@sourceCollection
       `
       let copyCursor = await that.db.query(copyAQL, {'@destinationCollection': attributeValue, '@sourceCollection': sourceCollection.name, attr: attribute, attrVal: attributeValue})
       let attributeValues = await copyCursor.all()

@@ -226,11 +226,11 @@ describe('GraphMigration', () => {
 
   })
 
-  describe('GraphMigration.splitCollection', () => {
+  describe('GraphMigration.splitEdgeCollection', () => {
 
-    it("move documents into other collections according to an attribute", async () => {
+    it("creates collections for the values of an attribute and moves edges into them", async () => {
       let gm = new GraphMigration("test")
-      let collections = await gm.splitCollection('type', 'edges')
+      let collections = await gm.splitEdgeCollection('type', 'edges')
       assert.equal(collections.includes('uses', 'works_in', 'located_at'), true)
     })
 
