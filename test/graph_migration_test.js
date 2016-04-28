@@ -226,5 +226,15 @@ describe('GraphMigration', () => {
 
   })
 
+  describe('GraphMigration.splitCollection', () => {
+
+    it("move documents into other collections according to an attribute", async () => {
+      let gm = new GraphMigration("test")
+      let collections = await gm.splitCollection('type', 'edges')
+      assert.equal(collections.includes('uses', 'works_in', 'located_at'), true)
+    })
+
+  })
+
 })
 
