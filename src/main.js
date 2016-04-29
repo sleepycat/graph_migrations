@@ -391,25 +391,21 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
 
   async splitEdgeCollection(attribute, collectionName) {
 
+    let sourceCollection = await this.db.collection(collectionName).get()
+    var destinationCollection = {}
+
     let aql = `
     FOR document in @@collection FILTER HAS(document, @attr) RETURN DISTINCT document[@attr]
     `
     let cursor = await this.db.query(aql, {'@collection': collectionName, attr: attribute})
     let attributeValues = await cursor.all()
-    let sourceCollection = await this.db.collection(collectionName).get()
-    var destinationCollection = {}
-    //XXX: think about this later.
-    var that = this
-
-    attributeValues.forEach(async (attributeValue) => {
-      // Is the source collection a document collection
-      // or and edge collection?
+    for(var i = 0; i < attributeValues.length; i++){
+      let attributeValue = attributeValues[i]
       // Create a new edge collection named after the attribute value
       try{
-        destinationCollection = await that.db.edgeCollection(attributeValue)
+        destinationCollection = await this.db.edgeCollection(attributeValue)
       } catch(e) {
       }
-
 
       //make sure this destinationCollection collection exists
       try {
@@ -426,13 +422,12 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
       INSERT UNSET(document, '_id', '_key', '_rev') IN @@destinationCollection
       REMOVE document IN @@sourceCollection
       `
-      let copyCursor = await that.db.query(copyAQL, {'@destinationCollection': attributeValue, '@sourceCollection': sourceCollection.name, attr: attribute, attrVal: attributeValue})
-      let attributeValues = await copyCursor.all()
-
-    })
+      let copyCursor = await this.db.query(copyAQL, {'@destinationCollection': attributeValue, '@sourceCollection': sourceCollection.name, attr: attribute, attrVal: attributeValue})
+    }
     let collections = await this.db.listCollections()
     return collections.map((collection) => {return collection.name})
   }
+
 
 }
 // TODO: Revisit this but use graphs instead of collections.

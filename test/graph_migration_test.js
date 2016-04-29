@@ -228,10 +228,29 @@ describe('GraphMigration', () => {
 
   describe('GraphMigration.splitEdgeCollection', () => {
 
+
+    afterEach(async () => {
+      //clean up after splitCollections:
+      let collections = [ 'uses', 'works_in', 'located_at' ]
+      let length =  collections.length
+      for(let i = 0; i < length; i++) {
+        try{
+          await db.collection(collections[i]).drop()
+        } catch(e){
+          //no collection no problem
+        }
+      }
+    })
+
     it("creates collections for the values of an attribute and moves edges into them", async () => {
       let gm = new GraphMigration("test")
       let collections = await gm.splitEdgeCollection('type', 'edges')
-      assert.equal(collections.includes('uses', 'works_in', 'located_at'), true)
+      let afterCursor = await db.query(`RETURN {works_in: LENGTH(works_in), uses: LENGTH(uses), located_at: LENGTH(located_at)}`)
+      let resultArray = await afterCursor.all()
+      let summary = resultArray[0]
+      assert.equal(summary.uses, 29)
+      assert.equal(summary.works_in, 4)
+      assert.equal(summary.located_at, 4)
     })
 
   })
