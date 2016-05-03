@@ -446,7 +446,7 @@ var GraphMigration = function () {
 
                   //Merge A onto B
                   var vertexBCollection = vertexB._id.split('/')[0];
-                  var mergeAQL = 'UPDATE @vertexB WITH MERGE(@vertexA, @vertexB) IN @@collection RETURN NEW';
+                  var mergeAQL = 'UPDATE @vertexB WITH MERGE(@vertexB, @vertexA) IN @@collection RETURN NEW';
                   var merged = db._query(mergeAQL, { vertexA: vertexA, vertexB: vertexB, '@collection': vertexBCollection }).toArray()[0];
 
                   //Remove vertexA
@@ -560,6 +560,254 @@ var GraphMigration = function () {
       }));
 
       return function eagerDelete(_x18, _x19) {
+        return ref.apply(this, arguments);
+      };
+    }()
+  }, {
+    key: 'splitEdgeCollection',
+    value: function () {
+      var ref = _asyncToGenerator(regeneratorRuntime.mark(function _callee8(attribute, collectionName) {
+        var sourceCollection, destinationCollection, aql, cursor, attributeValues, i, attributeValue, copyAQL, copyCursor, collections;
+        return regeneratorRuntime.wrap(function _callee8$(_context8) {
+          while (1) {
+            switch (_context8.prev = _context8.next) {
+              case 0:
+                _context8.next = 2;
+                return this.db.collection(collectionName).get();
+
+              case 2:
+                sourceCollection = _context8.sent;
+                destinationCollection = {};
+                aql = '\n    FOR document in @@collection FILTER HAS(document, @attr) RETURN DISTINCT document[@attr]\n    ';
+                _context8.next = 7;
+                return this.db.query(aql, { '@collection': collectionName, attr: attribute });
+
+              case 7:
+                cursor = _context8.sent;
+                _context8.next = 10;
+                return cursor.all();
+
+              case 10:
+                attributeValues = _context8.sent;
+                i = 0;
+
+              case 12:
+                if (!(i < attributeValues.length)) {
+                  _context8.next = 36;
+                  break;
+                }
+
+                attributeValue = attributeValues[i];
+                // Create a new edge collection named after the attribute value
+
+                _context8.prev = 14;
+                _context8.next = 17;
+                return this.db.edgeCollection(attributeValue);
+
+              case 17:
+                destinationCollection = _context8.sent;
+                _context8.next = 22;
+                break;
+
+              case 20:
+                _context8.prev = 20;
+                _context8.t0 = _context8['catch'](14);
+
+              case 22:
+                _context8.prev = 22;
+                _context8.next = 25;
+                return destinationCollection.create();
+
+              case 25:
+                _context8.next = 29;
+                break;
+
+              case 27:
+                _context8.prev = 27;
+                _context8.t1 = _context8['catch'](22);
+
+              case 29:
+                // it exists already.
+
+
+                //copy each doc to new collection
+                copyAQL = '\n      FOR document IN @@sourceCollection\n      FILTER document[@attr] == @attrVal\n      INSERT UNSET(document, \'_id\', \'_key\', \'_rev\') IN @@destinationCollection\n      REMOVE document IN @@sourceCollection\n      ';
+                _context8.next = 32;
+                return this.db.query(copyAQL, { '@destinationCollection': attributeValue, '@sourceCollection': sourceCollection.name, attr: attribute, attrVal: attributeValue });
+
+              case 32:
+                copyCursor = _context8.sent;
+
+              case 33:
+                i++;
+                _context8.next = 12;
+                break;
+
+              case 36:
+                _context8.next = 38;
+                return this.db.listCollections();
+
+              case 38:
+                collections = _context8.sent;
+                return _context8.abrupt('return', collections.map(function (collection) {
+                  return collection.name;
+                }));
+
+              case 40:
+              case 'end':
+                return _context8.stop();
+            }
+          }
+        }, _callee8, this, [[14, 20], [22, 27]]);
+      }));
+
+      return function splitEdgeCollection(_x20, _x21) {
+        return ref.apply(this, arguments);
+      };
+    }()
+  }, {
+    key: 'splitDocumentCollection',
+    value: function () {
+      var ref = _asyncToGenerator(regeneratorRuntime.mark(function _callee9(attribute, collectionName, graphName) {
+        var sourceCollection, destinationCollection, aql, cursor, attributeValues, i, attributeValue, action, collections, _i;
+
+        return regeneratorRuntime.wrap(function _callee9$(_context9) {
+          while (1) {
+            switch (_context9.prev = _context9.next) {
+              case 0:
+                _context9.next = 2;
+                return this.db.collection(collectionName).get();
+
+              case 2:
+                sourceCollection = _context9.sent;
+                destinationCollection = {};
+                aql = '\n    FOR document in @@collection FILTER HAS(document, @attr) RETURN DISTINCT document[@attr]\n    ';
+                _context9.next = 7;
+                return this.db.query(aql, { '@collection': collectionName, attr: attribute });
+
+              case 7:
+                cursor = _context9.sent;
+                _context9.next = 10;
+                return cursor.all();
+
+              case 10:
+                attributeValues = _context9.sent;
+                i = 0;
+
+              case 12:
+                if (!(i < attributeValues.length)) {
+                  _context9.next = 27;
+                  break;
+                }
+
+                attributeValue = attributeValues[i];
+                _context9.next = 16;
+                return this.db.collection(attributeValue);
+
+              case 16:
+                destinationCollection = _context9.sent;
+                _context9.prev = 17;
+                _context9.next = 20;
+                return destinationCollection.create();
+
+              case 20:
+                _context9.next = 24;
+                break;
+
+              case 22:
+                _context9.prev = 22;
+                _context9.t0 = _context9['catch'](17);
+
+              case 24:
+                i++;
+                _context9.next = 12;
+                break;
+
+              case 27:
+
+                //Now that we know the collections we will interact with
+                //we can use a transaction
+                action = String(function (args) {
+
+                  var attribute = args[0];
+                  var collectionName = args[1];
+                  var attributeValues = args[2];
+                  var graphName = args[3];
+
+                  var db = require("internal").db;
+                  var graph_module = require("@arangodb/general-graph");
+                  var graph = graph_module._graph(graphName);
+
+                  //TODO: we are going outside the collection here...
+                  //probably just pass the collection name
+                  var getDocsWithAttributeAQL = '\n        FOR document in @@collection FILTER HAS(document, @attr) RETURN document\n      ';
+                  var docsCursor = db._query(getDocsWithAttributeAQL, { '@collection': collectionName, attr: attribute });
+                  while (docsCursor.hasNext()) {
+                    var vertex = docsCursor.next();
+                    //get edges
+                    var getEdgesAQL = '\n          FOR edge in GRAPH_EDGES(@graph, @vertex, {includeData: true})\n            RETURN edge\n          ';
+                    var edgesCursor = db._query(getEdgesAQL, { graph: graphName, vertex: vertex });
+
+                    //copy doc to new collection return NEW
+                    var newDoc = db._query('INSERT UNSET(@doc, \'_id\', \'_key\', \'_rev\') IN @@collection RETURN NEW', { '@collection': vertex[attribute], doc: vertex }).toArray()[0];
+                    //recreate edges to point to new doc
+                    while (edgesCursor.hasNext()) {
+                      var edge = edgesCursor.next();
+                      //get the collection the edge lives in
+                      var edgeCollection = edge._id.split('/')[0];
+                      if (edge._to == vertex._id) {
+                        //point the edge at the new document we created
+                        edge._to == newDoc._id;
+                        //insert the new edge and delete the old one.
+                        var replaceEdgeAQL = '\n                INSERT UNSET(@edge, \'_id\', \'_key\', \'_rev\') IN @@edgeCollection\n              ';
+                        db._query(replaceEdgeAQL, { '@edgeCollection': edgeCollection, edge: edge });
+                        var replaceEdgeAQL = '\n                REMOVE @edge IN @@edgeCollection\n              ';
+                        db._query(replaceEdgeAQL, { '@edgeCollection': edgeCollection, edge: edge });
+                      }
+                      if (edge._from == vertex._id) {
+                        //point the edge at the new document we created
+                        edge._from == newDoc._id;
+                        //insert the new edge and delete the old one.
+                        var replaceEdgeAQL = '\n                INSERT UNSET(@edge, \'_id\', \'_key\', \'_rev\') IN @@edgeCollection\n              ';
+                        db._query(replaceEdgeAQL, { '@edgeCollection': edgeCollection, edge: edge });
+                        var replaceEdgeAQL = '\n                REMOVE @edge IN @@edgeCollection\n              ';
+                        db._query(replaceEdgeAQL, { '@edgeCollection': edgeCollection, edge: edge });
+                      }
+                    }
+                    db._query('REMOVE @vertex IN @@collection', { '@collection': collectionName, vertex: vertex });
+                  }
+                  //Not even sure what to return here.
+                  return true;
+                });
+
+                //combine the collections involved in the graph
+                //with the collections we just created
+                //so we can lock them all
+
+                _context9.next = 30;
+                return this.allCollections(graphName);
+
+              case 30:
+                collections = _context9.sent;
+
+                for (_i = 0; _i < attributeValues.length; _i++) {
+                  collections.push(attributeValues[_i]);
+                }
+                _context9.next = 34;
+                return this.db.transaction({ write: collections }, action, [attribute, collectionName, attributeValues, graphName]);
+
+              case 34:
+                return _context9.abrupt('return', _context9.sent);
+
+              case 35:
+              case 'end':
+                return _context9.stop();
+            }
+          }
+        }, _callee9, this, [[17, 22]]);
+      }));
+
+      return function splitDocumentCollection(_x22, _x23, _x24) {
         return ref.apply(this, arguments);
       };
     }()

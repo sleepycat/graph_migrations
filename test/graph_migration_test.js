@@ -231,7 +231,7 @@ describe('GraphMigration', () => {
 
     afterEach(async () => {
       //clean up after splitCollections:
-      let collections = [ 'uses', 'works_in', 'located_at' ]
+      let collections = [ 'uses', 'works_in', 'located_at', 'location', 'office', 'organization', 'technology' ]
       let length =  collections.length
       for(let i = 0; i < length; i++) {
         try{
@@ -245,12 +245,29 @@ describe('GraphMigration', () => {
     it("creates collections for the values of an attribute and moves edges into them", async () => {
       let gm = new GraphMigration("test")
       let collections = await gm.splitEdgeCollection('type', 'edges')
-      let afterCursor = await db.query(`RETURN {works_in: LENGTH(works_in), uses: LENGTH(uses), located_at: LENGTH(located_at)}`)
+      let afterCursor = await db.query(`RETURN {works_in: LENGTH(works_in), uses: LENGTH(uses), located_at: LENGTH(located_at), edges: LENGTH(edges)}`)
       let resultArray = await afterCursor.all()
       let summary = resultArray[0]
       assert.equal(summary.uses, 29)
       assert.equal(summary.works_in, 4)
       assert.equal(summary.located_at, 4)
+      assert.equal(summary.edges, 0)
+    })
+
+  })
+
+  describe('GraphMigration.splitDocumentCollection', () => {
+
+    it("creates collections for the values of an attribute and moves edges into them", async () => {
+      let gm = new GraphMigration("test")
+      let collections = await gm.splitDocumentCollection('type', 'vertices', 'test')
+      let afterCursor = await db.query(`RETURN {location: LENGTH(location), office: LENGTH(office), technology: LENGTH(technology), organization: LENGTH(organization), vertices: LENGTH(vertices)}`)
+      let resultArray = await afterCursor.all()
+      let summary = resultArray[0]
+      assert.equal(summary.location, 3)
+      assert.equal(summary.office, 4)
+      assert.equal(summary.technology, 14)
+      assert.equal(summary.vertices, 0)
     })
 
   })

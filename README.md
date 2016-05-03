@@ -161,10 +161,48 @@ will be orphaned by the deletion. If so, it deletes them too.
 gm.eagerDelete({name: "Bob"}, "knows_graph")
 ```
 
+## Misc
+
+Often graph data comes in two big buckets: vertices and edges. Arango
+gets some speed and efficiency out of splitting these two (normally
+huge) collections into a bunch of smaller ones. The following functions
+are aimed at helping with that.
+
+### splitDocumentCollection
+
+This function splits a collection based on an attribute. Assuming a
+document collection where each document has a type attribute (type:
+"author" or type: "book"), and a graph called test that includes this
+collection, we could split on the type like this:
+
+```
+gm.splitDocumentCollection('type', 'vertices', 'test')
+```
+The result would be the creation of collections called "author" and
+"book" with all the documents where `"type": "author"` being moved into
+the author collection and documents with `type: "book"` moved to the
+book collection.
+
+The important thing to note is that this function uses the graph ('test'
+above) to determine what edges are referencing this document and updates
+them to reference the document in it's new collection.
+
+### splitEdgeCollection
+
+This is basically the same idea, given an attribute, create collections
+for each of the values and move the edge into the appropriate
+collection.
+
+```
+gm.splitEdgeCollection('type', 'edges')
+```
+
+If you have a graph of two collections (say vertices and edges) and you
+want to split both, do the documents first.
+
 ## TODO
 
 * Flip edge function
-* Move vertices and edges to collections based on an attribute
 
 This is all highly experimental.
 Ideas and pull requests welcome.

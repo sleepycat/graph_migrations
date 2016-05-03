@@ -428,6 +428,104 @@ async attributeToVertex(example, graphName, edgeCollectionName, options) {
     return collections.map((collection) => {return collection.name})
   }
 
+  async splitDocumentCollection(attribute, collectionName, graphName) {
+
+    let sourceCollection = await this.db.collection(collectionName).get()
+    var destinationCollection = {}
+
+    let aql = `
+    FOR document in @@collection FILTER HAS(document, @attr) RETURN DISTINCT document[@attr]
+    `
+    let cursor = await this.db.query(aql, {'@collection': collectionName, attr: attribute})
+    let attributeValues = await cursor.all()
+    //create collections for all the attribute values
+    for(var i = 0; i < attributeValues.length; i++){
+      let attributeValue = attributeValues[i]
+      destinationCollection = await this.db.collection(attributeValue)
+      try{
+        await destinationCollection.create()
+      } catch(e) {
+      }
+    }
+
+    //Now that we know the collections we will interact with
+    //we can use a transaction
+    var action = String((args) => {
+
+      var attribute = args[0]
+      var collectionName = args[1]
+      var attributeValues = args[2]
+      var graphName = args[3]
+
+      var db = require("internal").db;
+      var graph_module = require("@arangodb/general-graph")
+      var graph = graph_module._graph(graphName)
+
+      //TODO: we are going outside the collection here...
+      //probably just pass the collection name
+      var getDocsWithAttributeAQL = `
+        FOR document in @@collection FILTER HAS(document, @attr) RETURN document
+      `
+      var docsCursor = db._query(getDocsWithAttributeAQL, {'@collection': collectionName, attr: attribute})
+      while(docsCursor.hasNext()){
+        var vertex = docsCursor.next()
+          //get edges
+          var getEdgesAQL = `
+          FOR edge in GRAPH_EDGES(@graph, @vertex, {includeData: true})
+            RETURN edge
+          `
+          var edgesCursor = db._query(getEdgesAQL, {graph: graphName, vertex: vertex})
+
+          //copy doc to new collection return NEW
+          var newDoc = db._query(`INSERT UNSET(@doc, '_id', '_key', '_rev') IN @@collection RETURN NEW`, {'@collection': vertex[attribute], doc: vertex}).toArray()[0]
+          //recreate edges to point to new doc
+          while(edgesCursor.hasNext()){
+            var edge = edgesCursor.next()
+            //get the collection the edge lives in
+            var edgeCollection = edge._id.split('/')[0]
+            if(edge._to == vertex._id){
+              //point the edge at the new document we created
+              edge._to == newDoc._id
+              //insert the new edge and delete the old one.
+              var replaceEdgeAQL = `
+                INSERT UNSET(@edge, '_id', '_key', '_rev') IN @@edgeCollection
+              `
+              db._query(replaceEdgeAQL, {'@edgeCollection': edgeCollection, edge: edge})
+              var replaceEdgeAQL = `
+                REMOVE @edge IN @@edgeCollection
+              `
+              db._query(replaceEdgeAQL, {'@edgeCollection': edgeCollection, edge: edge})
+            }
+            if(edge._from == vertex._id){
+              //point the edge at the new document we created
+              edge._from == newDoc._id
+              //insert the new edge and delete the old one.
+              var replaceEdgeAQL = `
+                INSERT UNSET(@edge, '_id', '_key', '_rev') IN @@edgeCollection
+              `
+              db._query(replaceEdgeAQL, {'@edgeCollection': edgeCollection, edge: edge})
+              var replaceEdgeAQL = `
+                REMOVE @edge IN @@edgeCollection
+              `
+              db._query(replaceEdgeAQL, {'@edgeCollection': edgeCollection, edge: edge})
+            }
+          }
+        db._query(`REMOVE @vertex IN @@collection`, {'@collection': collectionName, vertex: vertex})
+      }
+      //Not even sure what to return here.
+      return true
+    })
+
+
+    //combine the collections involved in the graph
+    //with the collections we just created
+    //so we can lock them all
+    let collections = await this.allCollections(graphName)
+    for(let i=0; i < attributeValues.length; i++){
+      collections.push(attributeValues[i])
+    }
+    return await this.db.transaction({write: collections}, action, [attribute, collectionName, attributeValues, graphName])
+  }
 
 }
 // TODO: Revisit this but use graphs instead of collections.
